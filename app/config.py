@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     # --- serving -----------------------------------------------------------
     cache_ttl_seconds: int = 900
+    # Gemini free tier allows only 5 chat requests/minute; back off and retry on 429.
+    retry_base_seconds: float = 8.0
     rate_limit_per_minute: int = 20
 
     index_dir: str = "index"

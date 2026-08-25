@@ -32,9 +32,8 @@ def hits(chunks: list[dict], case: dict) -> bool:
     )
 
 
-def refuses(index: Index, query: str) -> bool:
+def refuses(query: str, chunks: list[dict]) -> bool:
     """Run the same two guardrails the API applies and report whether they fire."""
-    chunks, _, _ = retrieve(index, query, TOP_K)
     if not chunks or chunks[0]["score"] < settings.min_rerank_score:
         return True
     answer, _, _ = generate_answer(query, chunks)
@@ -49,31 +48,36 @@ def main() -> None:
     print(f"{len(cases)} questions ({len(answerable)} answerable)\n")
 
     scores = {"dense only": 0, "hybrid (dense + BM25)": 0, "hybrid + rerank": 0}
-    for case in answerable:
+    guardrail_correct = 0
+
+    for number, case in enumerate(cases, start=1):
         query = case["question"]
         vector = embed_query(query)
-
-        dense = [index.chunks[i] for i in dense_ranking(index, vector, TOP_K)]
-        fused = [
-            index.chunks[i]
-            for i in _rrf(
-                dense_ranking(index, vector, settings.dense_k),
-                lexical_ranking(index, query, settings.bm25_k),
-            )
-        ]
         reranked, _, _ = retrieve(index, query, TOP_K)
 
-        scores["dense only"] += hits(dense, case)
-        scores["hybrid (dense + BM25)"] += hits(fused, case)
-        scores["hybrid + rerank"] += hits(reranked, case)
+        if case["answerable"]:
+            dense = [index.chunks[i] for i in dense_ranking(index, vector, TOP_K)]
+            fused = [
+                index.chunks[i]
+                for i in _rrf(
+                    dense_ranking(index, vector, settings.dense_k),
+                    lexical_ranking(index, query, settings.bm25_k),
+                )
+            ]
+            scores["dense only"] += hits(dense, case)
+            scores["hybrid (dense + BM25)"] += hits(fused, case)
+            scores["hybrid + rerank"] += hits(reranked, case)
 
-    print("Recall@5")
+        refused = refuses(query, reranked)
+        guardrail_correct += refused == (not case["answerable"])
+        print(f"  [{number}/{len(cases)}] {'refused' if refused else 'answered':<8} {query[:60]}")
+
+    print("\nRecall@5")
     for name, hit_count in scores.items():
         print(f"  {name:<24} {hit_count / len(answerable):>4.0%}  ({hit_count}/{len(answerable)})")
 
-    correct = sum(refuses(index, c["question"]) == (not c["answerable"]) for c in cases)
     print("\nGuardrail")
-    print(f"  answer / refuse decision {correct / len(cases):>4.0%}  ({correct}/{len(cases)})")
+    print(f"  answer / refuse decision {guardrail_correct / len(cases):>4.0%}  ({guardrail_correct}/{len(cases)})")
 
 
 if __name__ == "__main__":

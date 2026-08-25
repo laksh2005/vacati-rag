@@ -24,9 +24,11 @@ uvicorn app.main:app --reload
 - `http://localhost:8000/docs` — interactive OpenAPI reference
 
 ```bash
-pytest        # unit tests, Gemini mocked, no key or network needed
+pytest          # unit tests, Gemini mocked, no key or network needed
 python eval.py  # retrieval quality numbers over the golden question set
 ```
+
+> On the Gemini free tier `gemini-2.5-flash` is capped at 5 requests/minute. Every chat call retries with exponential backoff on a 429, so things still work — a query just occasionally pauses, and `eval.py` takes a few minutes. On a paid key neither is noticeable.
 
 ## API
 

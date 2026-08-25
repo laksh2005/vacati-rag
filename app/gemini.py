@@ -4,8 +4,11 @@ Keeping them in one file means there is exactly one place to look for what we
 send the model, what it costs, and how failures are surfaced.
 """
 
+import time
+from typing import Callable
+
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 
 from app.config import settings
 from app.schemas import GroundedAnswer, RerankScore
@@ -13,6 +16,7 @@ from app.schemas import GroundedAnswer, RerankScore
 _client: genai.Client | None = None
 
 EMBED_BATCH = 100
+RETRIES = 3
 
 
 class GeminiError(RuntimeError):
@@ -28,6 +32,21 @@ def client() -> genai.Client:
     return _client
 
 
+def _call(what: str, request: Callable):
+    """Run a Gemini call, backing off on 429s and wrapping everything else."""
+    for attempt in range(RETRIES + 1):
+        try:
+            return request()
+        except errors.ClientError as exc:
+            if exc.code == 429 and attempt < RETRIES:
+                time.sleep(settings.retry_base_seconds * 2**attempt)
+                continue
+            raise GeminiError(f"{what} failed: {exc}") from exc
+        except Exception as exc:  # noqa: BLE001 - one boundary for all SDK errors
+            raise GeminiError(f"{what} failed: {exc}") from exc
+    raise GeminiError(f"{what} failed: still rate limited after {RETRIES} retries")
+
+
 def embed_texts(texts: list[str], task_type: str) -> list[list[float]]:
     """Embed a list of texts.
 
@@ -37,17 +56,17 @@ def embed_texts(texts: list[str], task_type: str) -> list[list[float]]:
     vectors: list[list[float]] = []
     for start in range(0, len(texts), EMBED_BATCH):
         batch = texts[start : start + EMBED_BATCH]
-        try:
-            response = client().models.embed_content(
+        response = _call(
+            "embedding",
+            lambda batch=batch: client().models.embed_content(
                 model=settings.embed_model,
                 contents=batch,
                 config=types.EmbedContentConfig(
                     task_type=task_type,
                     output_dimensionality=settings.embed_dim,
                 ),
-            )
-        except Exception as exc:  # noqa: BLE001 - one boundary for all SDK errors
-            raise GeminiError(f"embedding failed: {exc}") from exc
+            ),
+        )
         vectors.extend(e.values for e in response.embeddings)
     return vectors
 
@@ -65,8 +84,9 @@ def rerank(query: str, candidates: list[dict]) -> tuple[dict[int, float], int, i
     passages = "\n\n".join(
         f"[{i}] {c['section']}\n{c['text']}" for i, c in enumerate(candidates)
     )
-    try:
-        response = client().models.generate_content(
+    response = _call(
+        "rerank",
+        lambda: client().models.generate_content(
             model=settings.chat_model,
             contents=f"Question: {query}\n\nPassages:\n{passages}",
             config=types.GenerateContentConfig(
@@ -76,9 +96,8 @@ def rerank(query: str, candidates: list[dict]) -> tuple[dict[int, float], int, i
                 response_schema=list[RerankScore],
                 thinking_config=types.ThinkingConfig(thinking_budget=0),
             ),
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise GeminiError(f"rerank failed: {exc}") from exc
+        ),
+    )
 
     scores = {row.id: row.score for row in (response.parsed or [])}
     return scores, _in_tokens(response), _out_tokens(response)
@@ -102,8 +121,9 @@ def generate_answer(query: str, chunks: list[dict]) -> tuple[GroundedAnswer, int
     context = "\n\n".join(
         f"[{i + 1}] {c['section']}\n{c['text']}" for i, c in enumerate(chunks)
     )
-    try:
-        response = client().models.generate_content(
+    response = _call(
+        "generation",
+        lambda: client().models.generate_content(
             model=settings.chat_model,
             contents=f"Context blocks:\n{context}\n\nQuestion: {query}",
             config=types.GenerateContentConfig(
@@ -113,9 +133,8 @@ def generate_answer(query: str, chunks: list[dict]) -> tuple[GroundedAnswer, int
                 response_schema=GroundedAnswer,
                 thinking_config=types.ThinkingConfig(thinking_budget=0),
             ),
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise GeminiError(f"generation failed: {exc}") from exc
+        ),
+    )
 
     answer = response.parsed
     if answer is None:
