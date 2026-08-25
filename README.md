@@ -2,7 +2,7 @@
 
 A small retrieval-augmented generation service over Vacati's travel documentation — property pages, cancellation policies, visa notes, a tours catalogue and an in-residence menu. Ask a question over HTTP, get an answer that is grounded in those documents, with the sources it used. When the documents don't cover the question, it says so instead of guessing.
 
-Everything runs on one Gemini API key: `gemini-embedding-001` for embeddings, `gemini-2.5-flash` for reranking and answering.
+Everything runs on one Gemini API key: `gemini-embedding-001` for embeddings, `gemini-3.5-flash` for reranking and answering.
 
 ```
 question ──► embed ──┬──► dense (cosine) ──┐
@@ -28,7 +28,7 @@ pytest          # unit tests, Gemini mocked, no key or network needed
 python eval.py  # retrieval quality numbers over the golden question set
 ```
 
-> On the Gemini free tier `gemini-2.5-flash` is capped at 5 requests/minute. Every chat call retries with exponential backoff on a 429, so things still work — a query just occasionally pauses, and `eval.py` takes a few minutes. On a paid key neither is noticeable.
+> Free-tier Gemini keys are rate limited per minute *and* per day, per model. Every chat call retries with exponential backoff on a 429, so a single query still succeeds (it just pauses), but `eval.py` makes ~36 calls and can exhaust a free daily quota. Set `CHAT_MODEL` in `.env` to switch models, and keep the price table in `app/config.py` in step with whatever you pick.
 
 ## API
 
@@ -61,8 +61,8 @@ Response:
       "score": 0.95
     }
   ],
-  "usage": { "input_tokens": 2841, "output_tokens": 96, "estimated_cost_usd": 0.001093, "cached": false },
-  "latency_ms": 2140
+  "usage": { "input_tokens": 2614, "output_tokens": 304, "estimated_cost_usd": 0.001543, "cached": false },
+  "latency_ms": 2518
 }
 ```
 
@@ -143,7 +143,7 @@ Chunk ids are content hashes, so re-running `ingest.py` re-embeds only what chan
 2. **Dense search** — cosine over a normalised matrix, top 20. Handles paraphrase: "can I bring my dog" → "one dog under 15 kg is permitted".
 3. **BM25** — top 20. Handles the things embeddings blur: `TR-104`, `EUR 890`, "48 hours", "Cliff House".
 4. **Reciprocal Rank Fusion** (k=60) to combine them. RRF works on ranks, so there is no need to normalise two incomparable score scales — a chunk that both methods like wins.
-5. **Rerank** — one `gemini-2.5-flash` call scores all 15 fused candidates in a single request and returns JSON. One call, not fifteen. The reranker is explicitly told that a passage about a *different* property or product scores below 0.3, which is what keeps the two lookalike policies apart at the final step.
+5. **Rerank** — one `gemini-3.5-flash` call scores all 15 fused candidates in a single request and returns JSON. One call, not fifteen. The reranker is explicitly told that a passage about a *different* property or product scores below 0.3, which is what keeps the two lookalike policies apart at the final step.
 
 ## Hallucination guardrails
 
@@ -156,28 +156,26 @@ Four layers, because none of them is sufficient alone:
 
 ## Cost and latency
 
-Measured per query on this corpus:
+Measured end to end against a local server on this corpus (`gemini-3.5-flash`):
 
-| Stage | Latency | Tokens | Cost |
-|---|---|---|---|
-| Query embedding | ~200 ms | ~15 | negligible |
-| Dense + BM25 + RRF | <5 ms | — | $0 |
-| Rerank (15 chunks, 1 call) | ~1.2 s | ~1,800 in / ~150 out | ~$0.0009 |
-| Answer (5 chunks) | ~1.5 s | ~900 in / ~120 out | ~$0.0006 |
-| **Total** | **~3 s** | | **~$0.0015** |
+| Query | Calls | Latency | Tokens | Cost |
+|---|---|---|---|---|
+| Grounded answer | embed + rerank + answer | 2.5–3.9 s | ~2,600 in / ~300 out | ~$0.0015 |
+| Out-of-scope (fallback) | embed + rerank | 2.5 s | ~1,800 in / ~250 out | ~$0.0012 |
+| Repeat of any query | none | **0 ms** | — | **$0** |
 
-Choices behind those numbers:
+Retrieval itself — dense, BM25 and RRF over 33 chunks — is under 5 ms and free; effectively all of the latency and all of the cost is the two model calls. That is what the choices below target:
 
 - **Flash, not Pro**, with `thinking_budget=0`. Grounded extraction from five short passages does not need a reasoning model; it needs a fast one that follows instructions.
 - **One rerank call**, not one per candidate. Scoring 15 passages in a single request is roughly 15× cheaper and ~10× faster than a per-passage cross-encoder loop.
 - **768-dimension embeddings** instead of the 3072 default: a quarter of the index size and memory, with no measurable recall loss on this corpus. Vectors are re-normalised after truncation, which the model requires for dimensions other than 3072.
-- **Response cache** keyed on the normalised query — a repeated question returns in ~1 ms at $0. FAQ-style traffic repeats heavily, so this is the single cheapest win available.
+- **Response cache** keyed on the normalised query — a repeated question returns in 0 ms at $0 (verified above). FAQ-style traffic repeats heavily, so this is the single cheapest win available.
 - **Skipping generation on low-relevance queries**, which removes the answer call from every out-of-scope question.
 - Every response reports its own token usage and estimated cost, so a caller can meter spend without a separate billing integration. Prices live in [`app/config.py`](app/config.py).
 
 ## Retrieval quality
 
-`python eval.py` scores 18 golden questions (13 answerable, 5 that the corpus deliberately cannot answer) and compares three pipelines:
+`python eval.py` scores 18 golden questions (14 answerable, 4 that the corpus deliberately cannot answer) and compares three pipelines:
 
 | Strategy | Recall@5 |
 |---|---|
@@ -189,7 +187,7 @@ It also reports how often the guardrail makes the right answer/refuse call — t
 
 ## Tradeoffs
 
-- **A numpy array is the vector store.** For ~35 chunks, brute-force cosine takes microseconds; an ANN index would add a dependency, a build step and approximation error to buy nothing. The swap point is in the Scaling section below.
+- **A numpy array is the vector store.** For 33 chunks, brute-force cosine takes microseconds; an ANN index would add a dependency, a build step and approximation error to buy nothing. The swap point is in the Scaling section below.
 - **The reranker is an LLM, not a cross-encoder.** A dedicated reranker would be faster and cheaper per call, but it is another provider and another key. One Gemini key for the whole system was worth ~1.2 s.
 - **Cache and rate limiter are in-process dicts.** Correct for one instance, wrong the moment there are two. Redis is the fix and it is a small one; building it now would have been building for an audience that doesn't exist yet.
 - **Token counts for embeddings are estimated** (~4 chars/token) since the embeddings endpoint doesn't return usage. Chat token counts are exact, from `usage_metadata`. Embeddings are a rounding error in the total either way.

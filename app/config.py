@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # --- models ------------------------------------------------------------
     embed_model: str = "gemini-embedding-001"
-    chat_model: str = "gemini-2.5-flash"
+    chat_model: str = "gemini-3.5-flash"
     # gemini-embedding-001 defaults to 3072 dims; 768 keeps the index 4x smaller
     # at close to the same retrieval quality (see README > Tradeoffs).
     embed_dim: int = 768
@@ -28,13 +28,15 @@ class Settings(BaseSettings):
 
     # --- serving -----------------------------------------------------------
     cache_ttl_seconds: int = 900
-    # Gemini free tier allows only 5 chat requests/minute; back off and retry on 429.
+    # Free-tier keys are rate limited hard; back off and retry on 429.
     retry_base_seconds: float = 8.0
     rate_limit_per_minute: int = 20
 
     index_dir: str = "index"
 
-    # --- pricing (USD per 1M tokens, Gemini list prices) -------------------
+    # --- pricing (USD per 1M tokens) ---------------------------------------
+    # List prices for the models above. Update these whenever chat_model changes,
+    # or the cost reported on every response silently drifts from reality.
     price_embed_input: float = 0.15
     price_chat_input: float = 0.30
     price_chat_output: float = 2.50
