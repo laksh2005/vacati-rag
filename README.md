@@ -24,11 +24,12 @@ uvicorn app.main:app --reload
 - `http://localhost:8000/docs` — interactive OpenAPI reference
 
 ```bash
-pytest          # unit tests, Gemini mocked, no key or network needed
-python eval.py  # retrieval quality numbers over the golden question set
+pytest                          # unit tests, Gemini mocked, no key or network needed
+python eval.py                  # full retrieval + guardrail scoring (uses chat quota)
+python eval.py --retrieval-only # dense vs hybrid only: free, instant, no model calls
 ```
 
-> Free-tier Gemini keys are rate limited per minute *and* per day, per model. Every chat call retries with exponential backoff on a 429, so a single query still succeeds (it just pauses), but `eval.py` makes ~36 calls and can exhaust a free daily quota. Set `CHAT_MODEL` in `.env` to switch models, and keep the price table in `app/config.py` in step with whatever you pick.
+> Free-tier Gemini keys are rate limited per minute *and* per day, per model. Every chat call retries with exponential backoff on a 429, so a single query still succeeds (it just pauses), but a full `eval.py` run makes ~40 calls and will exhaust a free daily quota (20/day/model on the key this was built with) — use `--retrieval-only` in that case. Set `CHAT_MODEL` in `.env` to switch models, and keep the price table in `app/config.py` in step with whatever you pick.
 
 ## API
 
@@ -175,20 +176,26 @@ Retrieval itself — dense, BM25 and RRF over 33 chunks — is under 5 ms and fr
 
 ## Retrieval quality
 
-`python eval.py` scores 18 golden questions (14 answerable, 4 that the corpus deliberately cannot answer) and compares three pipelines:
+`python eval.py` scores 21 golden questions (17 answerable, 4 that the corpus deliberately cannot answer) and compares three pipelines. `python eval.py --retrieval-only` scores the first two, which need no model calls — free and instant, which makes it the right loop when tuning chunking or fusion.
 
-| Strategy | Recall@5 |
-|---|---|
-| Dense only | _run `python eval.py`_ |
-| Hybrid (dense + BM25) | |
-| Hybrid + rerank | |
+| Strategy | Recall@1 | Recall@5 |
+|---|---|---|
+| Dense only | 88% | 100% |
+| Hybrid (dense + BM25) | **94%** | 100% |
+| Hybrid + rerank | needs chat quota | needs chat quota |
 
-It also reports how often the guardrail makes the right answer/refuse call — the metric that matters most, since a confident wrong answer about a refund window is worse than no answer.
+Two honest notes about these numbers:
+
+**Recall@5 is saturated.** With 33 chunks, five slots are most of the neighbourhood — every strategy finds the right chunk somewhere in the top five. Recall@1 is the metric that separates them, and it only separates them once the question set contains cases designed to be hard: exact strings (`"What is the 48 hour rule?"`, `"How slow is the SS163?"`) and cross-property disambiguation (`"Which property has 300 Mbps wifi?"`, where both properties document their wifi speed). On the original, easier questions all strategies scored 100% at both k — a saturated benchmark that would have made the pipeline look validated when it was only untested.
+
+**The rerank and guardrail rows are unmeasured.** The free-tier Gemini key used here allows 20 chat requests per day per model, and a full eval run needs ~40. `python eval.py` on a paid key fills both rows and adds the guardrail score — how often the answer/refuse decision is correct, which is the number that matters most, since a confident wrong answer about a refund window is worse than no answer at all.
+
+The reranker's contribution here is less about reordering — hybrid already puts the right chunk first 94% of the time — and more about producing the relevance score the guardrail thresholds on. That is what turns "the top chunk is wrong" into a refusal instead of a confident mistake.
 
 ## Tradeoffs
 
 - **A numpy array is the vector store.** For 33 chunks, brute-force cosine takes microseconds; an ANN index would add a dependency, a build step and approximation error to buy nothing. The swap point is in the Scaling section below.
-- **The reranker is an LLM, not a cross-encoder.** A dedicated reranker would be faster and cheaper per call, but it is another provider and another key. One Gemini key for the whole system was worth ~1.2 s.
+- **The reranker is an LLM, not a cross-encoder.** A dedicated reranker would be faster and cheaper per call, but it is another provider and another key to manage. Keeping the whole system on one Gemini key was worth the extra round trip.
 - **Cache and rate limiter are in-process dicts.** Correct for one instance, wrong the moment there are two. Redis is the fix and it is a small one; building it now would have been building for an audience that doesn't exist yet.
 - **Token counts for embeddings are estimated** (~4 chars/token) since the embeddings endpoint doesn't return usage. Chat token counts are exact, from `usage_metadata`. Embeddings are a rounding error in the total either way.
 - **The corpus is synthetic.** It was written to include hard cases — two near-identical policies, exact prices, allergen lists — rather than scraped from real properties.

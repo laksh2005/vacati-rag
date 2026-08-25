@@ -82,3 +82,20 @@
 
 - question: How do I get a mortgage?
   answerable: false
+
+# Hard cases: exact strings and cross-property disambiguation, where dense
+# similarity alone is weakest.
+- question: What is the 48 hour rule?
+  doc: cancellation-policy.md
+  section: Cliff House
+  answerable: true
+
+- question: Which property has 300 Mbps wifi?
+  doc: villa-aurora.md
+  section: The property
+  answerable: true
+
+- question: How slow is the SS163?
+  doc: amalfi-guide.md
+  section: Getting around
+  answerable: true
