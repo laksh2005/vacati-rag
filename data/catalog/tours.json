@@ -1,0 +1,78 @@
+{
+  "record_type": "tour",
+  "title": "Vacati Tours and Experiences",
+  "records": [
+    {
+      "id": "TR-101",
+      "name": "Path of the Gods Guided Hike",
+      "price_eur": 75,
+      "duration": "4 hours",
+      "group_size_max": 12,
+      "difficulty": "moderate",
+      "includes": ["English-speaking guide", "trail snack", "return bus ticket"],
+      "excludes": ["lunch", "hotel pickup"],
+      "meeting_point": "Bomerano square, Agerola",
+      "availability": "April to October, Tuesday and Saturday, 08:30"
+    },
+    {
+      "id": "TR-102",
+      "name": "Capri Private Boat Day",
+      "price_eur": 890,
+      "duration": "8 hours",
+      "group_size_max": 8,
+      "difficulty": "easy",
+      "includes": ["skipper", "fuel", "snorkelling gear", "prosecco and fruit"],
+      "excludes": ["Blue Grotto entry fee", "lunch ashore"],
+      "meeting_point": "Positano main jetty",
+      "availability": "May to September, daily, 09:00"
+    },
+    {
+      "id": "TR-103",
+      "name": "Lemon Grove Tour and Limoncello Tasting",
+      "price_eur": 45,
+      "duration": "2 hours",
+      "group_size_max": 15,
+      "difficulty": "easy",
+      "includes": ["grove walk", "limoncello tasting", "lemon cake"],
+      "excludes": ["transport to Minori"],
+      "meeting_point": "Minori seafront, in front of the basilica",
+      "availability": "Year-round, Monday to Friday, 10:00 and 16:00"
+    },
+    {
+      "id": "TR-104",
+      "name": "Pompeii and Vesuvius Full Day",
+      "price_eur": 165,
+      "duration": "9 hours",
+      "group_size_max": 10,
+      "difficulty": "moderate",
+      "includes": ["archaeologist guide", "Pompeii entry", "Vesuvius entry", "air-conditioned minivan", "hotel pickup"],
+      "excludes": ["lunch"],
+      "meeting_point": "Hotel pickup on the Amalfi coast road",
+      "availability": "Year-round, Wednesday and Sunday, 07:30"
+    },
+    {
+      "id": "TR-105",
+      "name": "Sunset Sailing with Aperitivo",
+      "price_eur": 120,
+      "duration": "3 hours",
+      "group_size_max": 16,
+      "difficulty": "easy",
+      "includes": ["shared sailing yacht", "aperitivo board", "wine and soft drinks"],
+      "excludes": ["hotel transfer"],
+      "meeting_point": "Amalfi marina, pier 3",
+      "availability": "June to September, daily, 18:30"
+    },
+    {
+      "id": "TR-106",
+      "name": "Hands-On Pasta Class with a Nonna",
+      "price_eur": 95,
+      "duration": "3 hours",
+      "group_size_max": 8,
+      "difficulty": "easy",
+      "includes": ["all ingredients", "apron", "the meal you cook", "house wine"],
+      "excludes": ["transport"],
+      "meeting_point": "Private home in Praiano, address sent on booking",
+      "availability": "Year-round, Thursday and Saturday, 17:00"
+    }
+  ]
+}

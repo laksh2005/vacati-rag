@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vacati RAG</title>
+<style>
+  :root { --bg:#0f1115; --card:#171a21; --line:#262b35; --text:#e6e8ec; --dim:#9aa3b2; --accent:#6ea8fe; --warn:#f0b429; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:32px 16px; background:var(--bg); color:var(--text);
+         font:16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  p.sub { color:var(--dim); margin:0 0 24px; font-size:14px; }
+  input, button { font:inherit; border-radius:8px; border:1px solid var(--line); }
+  input { width:100%; padding:11px 13px; background:var(--card); color:var(--text); }
+  input:focus { outline:1px solid var(--accent); }
+  .row { display:flex; gap:8px; margin-bottom:10px; }
+  button { padding:11px 18px; background:var(--accent); color:#0f1115; border:none; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  .samples { display:flex; flex-wrap:wrap; gap:6px; margin: 4px 0 24px; }
+  .samples button { background:transparent; border:1px solid var(--line); color:var(--dim); font-size:13px; padding:6px 10px; font-weight:400; }
+  #answer { background:var(--card); border:1px solid var(--line); border-left:3px solid var(--accent);
+            border-radius:10px; padding:16px 18px; white-space:pre-wrap; }
+  #answer.fallback { border-left-color:var(--warn); color:var(--warn); }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:24px 0 8px; }
+  .cite { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:8px; }
+  .cite .head { display:flex; justify-content:space-between; gap:12px; font-size:13px; }
+  .cite .sec { color:var(--accent); }
+  .cite .score { color:var(--dim); }
+  .cite .snip { color:var(--dim); font-size:14px; margin-top:6px; }
+  #meta { color:var(--dim); font-size:13px; margin-top:20px; display:flex; gap:14px; flex-wrap:wrap; }
+  .badge { background:#1d3a2a; color:#7ee2a8; border-radius:6px; padding:1px 8px; font-size:12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Vacati RAG</h1>
+  <p class="sub">Grounded answers over Vacati's travel docs, tours and menu. Every answer cites its sources, or says it doesn't know.</p>
+
+  <div class="row"><input id="key" type="password" placeholder="X-API-Key (demo-key)" /></div>
+  <div class="row">
+    <input id="q" placeholder="Ask a question…" autocomplete="off" />
+    <button id="ask">Ask</button>
+  </div>
+  <div class="samples"></div>
+
+  <div id="answer">Ask something to get started.</div>
+  <div id="cites"></div>
+  <div id="meta"></div>
+</main>
+
+<script>
+const SAMPLES = [
+  "What is the cancellation policy for Villa Aurora?",
+  "How much is the Pompeii and Vesuvius tour, and what does it include?",
+  "Which dishes on the menu are vegan?",
+  "Can I bring my dog to Cliff House?",
+  "What is the wifi password?"
+];
+
+const $ = (id) => document.getElementById(id);
+const keyInput = $("key"), qInput = $("q"), askBtn = $("ask");
+
+keyInput.value = localStorage.getItem("vacati_key") || "";
+keyInput.addEventListener("change", () => localStorage.setItem("vacati_key", keyInput.value));
+
+for (const sample of SAMPLES) {
+  const button = document.createElement("button");
+  button.textContent = sample;
+  button.onclick = () => { qInput.value = sample; ask(); };
+  document.querySelector(".samples").append(button);
+}
+
+askBtn.onclick = ask;
+qInput.addEventListener("keydown", (event) => { if (event.key === "Enter") ask(); });
+
+async function ask() {
+  const query = qInput.value.trim();
+  if (!query) return;
+
+  askBtn.disabled = true;
+  $("answer").className = "";
+  $("answer").textContent = "Retrieving…";
+  $("cites").innerHTML = "";
+  $("meta").textContent = "";
+
+  try {
+    const response = await fetch("/v1/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": keyInput.value },
+      body: JSON.stringify({ query })
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      $("answer").className = "fallback";
+      $("answer").textContent = `${data.error.code}: ${data.error.message}`;
+      return;
+    }
+    render(data);
+  } catch (error) {
+    $("answer").className = "fallback";
+    $("answer").textContent = String(error);
+  } finally {
+    askBtn.disabled = false;
+  }
+}
+
+function render(data) {
+  const grounded = data.answer_type === "grounded";
+  $("answer").className = grounded ? "" : "fallback";
+  $("answer").textContent = data.answer;
+
+  if (data.citations.length) {
+    $("cites").innerHTML = "<h2>Sources</h2>" + data.citations.map((c) => `
+      <div class="cite">
+        <div class="head">
+          <span class="sec">${escapeHtml(c.section)}</span>
+          <span class="score">${c.document} · ${c.score}</span>
+        </div>
+        <div class="snip">${escapeHtml(c.snippet)}…</div>
+      </div>`).join("");
+  }
+
+  const usage = data.usage;
+  $("meta").innerHTML = [
+    `${data.latency_ms} ms`,
+    `${usage.input_tokens} in / ${usage.output_tokens} out tokens`,
+    `$${usage.estimated_cost_usd.toFixed(6)}`,
+    usage.cached ? `<span class="badge">cached</span>` : ""
+  ].filter(Boolean).join(" · ");
+}
+
+function escapeHtml(text) {
+  return text.replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]));
+}
+</script>
+</body>
+</html>

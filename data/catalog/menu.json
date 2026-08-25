@@ -1,0 +1,94 @@
+{
+  "record_type": "menu_item",
+  "title": "Villa Aurora In-Residence Dining Menu",
+  "records": [
+    {
+      "id": "MN-201",
+      "name": "Scialatielli ai Frutti di Mare",
+      "course": "primo",
+      "price_eur": 28,
+      "description": "Hand-cut scialatielli with clams, mussels, prawns and cherry tomato",
+      "dietary": [],
+      "allergens": ["gluten", "shellfish", "molluscs"],
+      "prep_minutes": 25,
+      "available": "dinner"
+    },
+    {
+      "id": "MN-202",
+      "name": "Delizia al Limone",
+      "course": "dessert",
+      "price_eur": 12,
+      "description": "Sponge dome soaked in limoncello with lemon cream",
+      "dietary": ["vegetarian"],
+      "allergens": ["gluten", "eggs", "milk"],
+      "prep_minutes": 10,
+      "available": "lunch, dinner"
+    },
+    {
+      "id": "MN-203",
+      "name": "Insalata Caprese",
+      "course": "antipasto",
+      "price_eur": 16,
+      "description": "Buffalo mozzarella, tomato, basil and Cilento olive oil",
+      "dietary": ["vegetarian", "gluten-free"],
+      "allergens": ["milk"],
+      "prep_minutes": 8,
+      "available": "lunch, dinner"
+    },
+    {
+      "id": "MN-204",
+      "name": "Grilled Sea Bream with Lemon Leaves",
+      "course": "secondo",
+      "price_eur": 34,
+      "description": "Whole line-caught bream grilled over charcoal, dressed with olive oil",
+      "dietary": ["gluten-free", "dairy-free"],
+      "allergens": ["fish"],
+      "prep_minutes": 30,
+      "available": "dinner"
+    },
+    {
+      "id": "MN-205",
+      "name": "Melanzane alla Parmigiana",
+      "course": "secondo",
+      "price_eur": 22,
+      "description": "Layered aubergine baked with tomato, basil and parmesan",
+      "dietary": ["vegetarian"],
+      "allergens": ["milk"],
+      "prep_minutes": 40,
+      "available": "lunch, dinner"
+    },
+    {
+      "id": "MN-206",
+      "name": "Vegan Ciambotta",
+      "course": "secondo",
+      "price_eur": 19,
+      "description": "Slow-cooked summer vegetable stew with peppers, courgette and potato",
+      "dietary": ["vegan", "gluten-free", "dairy-free"],
+      "allergens": [],
+      "prep_minutes": 35,
+      "available": "lunch, dinner"
+    },
+    {
+      "id": "MN-207",
+      "name": "Colazione Amalfitana",
+      "course": "breakfast",
+      "price_eur": 18,
+      "description": "Sfogliatella, seasonal fruit, yoghurt, espresso and fresh juice",
+      "dietary": ["vegetarian"],
+      "allergens": ["gluten", "milk", "eggs", "nuts"],
+      "prep_minutes": 15,
+      "available": "breakfast"
+    },
+    {
+      "id": "MN-208",
+      "name": "Private Chef Tasting Menu",
+      "course": "set menu",
+      "price_eur": 95,
+      "description": "Six courses built around the morning market, per person, minimum four guests",
+      "dietary": [],
+      "allergens": ["varies, confirmed at booking"],
+      "prep_minutes": 180,
+      "available": "dinner, 48 hours notice"
+    }
+  ]
+}

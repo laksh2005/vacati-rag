@@ -1,0 +1,84 @@
+# Golden set for eval.py.
+#   doc / section: the chunk that should be retrieved (section match is a substring)
+#   answerable: false means the correct behaviour is the insufficient_context fallback
+- question: What is the cancellation policy for Villa Aurora?
+  doc: cancellation-policy.md
+  section: Villa Aurora
+  answerable: true
+
+- question: If I cancel Cliff House 3 days before check-in, do I get money back?
+  doc: cancellation-policy.md
+  section: Cliff House
+  answerable: true
+
+- question: How much is the Pompeii and Vesuvius tour and what does it include?
+  doc: tours.json
+  section: TR-104
+  answerable: true
+
+- question: What does TR-102 cost?
+  doc: tours.json
+  section: TR-102
+  answerable: true
+
+- question: Which dishes on the menu are vegan?
+  doc: menu.json
+  section: MN-206
+  answerable: true
+
+- question: Does anything on the menu contain shellfish?
+  doc: menu.json
+  section: MN-201
+  answerable: true
+
+- question: Can I bring my dog?
+  doc: cliff-house.md
+  section: House rules
+  answerable: true
+
+- question: Is Villa Aurora suitable for someone who cannot manage stairs?
+  doc: villa-aurora.md
+  section: Access
+  answerable: true
+
+- question: What is the minimum stay at Cliff House in July?
+  doc: cliff-house.md
+  section: Rates
+  answerable: true
+
+- question: Do Americans need a visa for Italy?
+  doc: visa-entry.md
+  section: Schengen
+  answerable: true
+
+- question: How much does ETIAS cost?
+  doc: visa-entry.md
+  section: ETIAS
+  answerable: true
+
+- question: Is there a tourist tax and how much is it?
+  doc: booking-faq.md
+  section: nightly rate
+  answerable: true
+
+- question: When is the best time of year to visit the Amalfi coast?
+  doc: amalfi-guide.md
+  section: When to go
+  answerable: true
+
+- question: What is the wifi password at Villa Aurora?
+  answerable: false
+
+- question: Can I get a refund because it rained during my stay?
+  doc: cancellation-policy.md
+  section: Weather
+  answerable: true
+
+- question: Does Vacati operate any properties in Thailand?
+  answerable: false
+
+- question: What is your CEO's home address?
+  answerable: false
+
+- question: How do I get a mortgage?
+  answerable: false
