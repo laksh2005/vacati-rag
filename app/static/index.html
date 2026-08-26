@@ -4,33 +4,95 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Vacati RAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet" />
 <style>
-  :root { --bg:#0f1115; --card:#171a21; --line:#262b35; --text:#e6e8ec; --dim:#9aa3b2; --accent:#6ea8fe; --warn:#f0b429; }
+  :root {
+    --font: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --bg-1: #1a1033; --bg-2: #0e1730; --bg-3: #2a1245;
+    --text: #f4f1fb; --dim: #b3aed1;
+    --glass: rgba(255,255,255,0.07); --glass-strong: rgba(255,255,255,0.12);
+    --border: rgba(255,255,255,0.14); --border-strong: rgba(255,255,255,0.28);
+    --accent: #9a8cff; --accent-2: #6ee7d8; --warn: #ffc98b;
+  }
   * { box-sizing: border-box; }
-  body { margin:0; padding:32px 16px; background:var(--bg); color:var(--text);
-         font:16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 760px; margin: 0 auto; }
-  h1 { font-size:22px; margin:0 0 4px; }
-  p.sub { color:var(--dim); margin:0 0 24px; font-size:14px; }
-  input, button { font:inherit; border-radius:8px; border:1px solid var(--line); }
-  input { width:100%; padding:11px 13px; background:var(--card); color:var(--text); }
-  input:focus { outline:1px solid var(--accent); }
-  .row { display:flex; gap:8px; margin-bottom:10px; }
-  button { padding:11px 18px; background:var(--accent); color:#0f1115; border:none; font-weight:600; cursor:pointer; }
-  button:disabled { opacity:.5; cursor:default; }
-  .samples { display:flex; flex-wrap:wrap; gap:6px; margin: 4px 0 24px; }
-  .samples button { background:transparent; border:1px solid var(--line); color:var(--dim); font-size:13px; padding:6px 10px; font-weight:400; }
-  #answer { background:var(--card); border:1px solid var(--line); border-left:3px solid var(--accent);
-            border-radius:10px; padding:16px 18px; white-space:pre-wrap; }
-  #answer.fallback { border-left-color:var(--warn); color:var(--warn); }
-  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:24px 0 8px; }
-  .cite { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:8px; }
-  .cite .head { display:flex; justify-content:space-between; gap:12px; font-size:13px; }
-  .cite .sec { color:var(--accent); }
-  .cite .score { color:var(--dim); }
-  .cite .snip { color:var(--dim); font-size:14px; margin-top:6px; }
-  #meta { color:var(--dim); font-size:13px; margin-top:20px; display:flex; gap:14px; flex-wrap:wrap; }
-  .badge { background:#1d3a2a; color:#7ee2a8; border-radius:6px; padding:1px 8px; font-size:12px; }
+  body {
+    margin: 0; min-height: 100vh; padding: 48px 20px;
+    font-family: var(--font); color: var(--text);
+    background:
+      radial-gradient(circle at 15% 10%, rgba(154,140,255,0.35), transparent 45%),
+      radial-gradient(circle at 85% 20%, rgba(110,231,216,0.22), transparent 40%),
+      radial-gradient(circle at 50% 90%, rgba(255,120,180,0.18), transparent 45%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2) 60%, var(--bg-3));
+    background-attachment: fixed;
+  }
+  main { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 30px; font-weight: 650; margin: 0 0 6px; letter-spacing: -0.02em; }
+  p.sub { color: var(--dim); margin: 0 0 28px; font-size: 15px; max-width: 55ch; }
+
+  .glass {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  }
+
+  .panel { padding: 20px; margin-bottom: 16px; }
+
+  input {
+    width: 100%; font-family: var(--font); font-size: 15px;
+    padding: 13px 16px; color: var(--text);
+    background: rgba(0,0,0,0.18); border: 1px solid var(--border);
+    border-radius: 12px; outline: none; transition: border-color .15s, background .15s;
+  }
+  input::placeholder { color: var(--dim); }
+  input:focus { border-color: var(--accent); background: rgba(0,0,0,0.28); }
+
+  .row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .row input { flex: 1; }
+
+  button {
+    font-family: var(--font); font-weight: 600; font-size: 15px;
+    padding: 13px 22px; border: 1px solid var(--border-strong); border-radius: 12px;
+    color: #150c2b; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 4px 16px rgba(154,140,255,0.35);
+    transition: transform .12s, box-shadow .12s;
+  }
+  button:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(154,140,255,0.5); }
+  button:active { transform: translateY(0); }
+  button:disabled { opacity: .5; cursor: default; transform: none; box-shadow: none; }
+
+  .samples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .samples button {
+    background: var(--glass); color: var(--dim); font-weight: 400; font-size: 13px;
+    padding: 8px 14px; box-shadow: none; border: 1px solid var(--border);
+  }
+  .samples button:hover { color: var(--text); border-color: var(--border-strong); background: var(--glass-strong); box-shadow: none; }
+
+  #answer { font-size: 15.5px; line-height: 1.65; white-space: pre-wrap; border-left: 3px solid var(--accent); }
+  #answer.fallback { border-left-color: var(--warn); color: var(--warn); }
+  #answer.empty { color: var(--dim); border-left-color: var(--border); }
+
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); font-weight: 600; margin: 0 0 10px; }
+  .cite { padding: 14px 16px; margin-bottom: 10px; }
+  .cite .head { display: flex; justify-content: space-between; gap: 14px; font-size: 13px; margin-bottom: 6px; }
+  .cite .sec { color: var(--accent-2); font-weight: 600; }
+  .cite .meta { color: var(--dim); white-space: nowrap; }
+  .cite .snip { color: var(--dim); font-size: 14px; line-height: 1.5; }
+
+  #meta {
+    color: var(--dim); font-size: 13px; padding: 12px 18px;
+    display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
+  }
+  .badge {
+    background: rgba(110,231,216,0.18); color: var(--accent-2);
+    border: 1px solid rgba(110,231,216,0.35);
+    border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600;
+  }
 </style>
 </head>
 <body>
@@ -38,16 +100,18 @@
   <h1>Vacati RAG</h1>
   <p class="sub">Grounded answers over Vacati's travel docs, tours and menu. Every answer cites its sources, or says it doesn't know.</p>
 
-  <div class="row"><input id="key" type="password" placeholder="X-API-Key (demo-key)" /></div>
-  <div class="row">
-    <input id="q" placeholder="Ask a question…" autocomplete="off" />
-    <button id="ask">Ask</button>
+  <div class="glass panel">
+    <div class="row"><input id="key" type="password" placeholder="X-API-Key (demo-key)" /></div>
+    <div class="row">
+      <input id="q" placeholder="Ask a question..." autocomplete="off" />
+      <button id="ask">Ask</button>
+    </div>
+    <div class="samples"></div>
   </div>
-  <div class="samples"></div>
 
-  <div id="answer">Ask something to get started.</div>
+  <div id="answer" class="glass panel empty">Ask something to get started.</div>
   <div id="cites"></div>
-  <div id="meta"></div>
+  <div id="meta" class="glass" style="display:none"></div>
 </main>
 
 <script>
@@ -80,10 +144,10 @@ async function ask() {
   if (!query) return;
 
   askBtn.disabled = true;
-  $("answer").className = "";
-  $("answer").textContent = "Retrieving…";
+  $("answer").className = "glass panel empty";
+  $("answer").textContent = "Retrieving...";
   $("cites").innerHTML = "";
-  $("meta").textContent = "";
+  $("meta").style.display = "none";
 
   try {
     const response = await fetch("/v1/query", {
@@ -94,13 +158,13 @@ async function ask() {
     const data = await response.json();
 
     if (!response.ok) {
-      $("answer").className = "fallback";
+      $("answer").className = "glass panel fallback";
       $("answer").textContent = `${data.error.code}: ${data.error.message}`;
       return;
     }
     render(data);
   } catch (error) {
-    $("answer").className = "fallback";
+    $("answer").className = "glass panel fallback";
     $("answer").textContent = String(error);
   } finally {
     askBtn.disabled = false;
@@ -109,27 +173,28 @@ async function ask() {
 
 function render(data) {
   const grounded = data.answer_type === "grounded";
-  $("answer").className = grounded ? "" : "fallback";
+  $("answer").className = "glass panel " + (grounded ? "" : "fallback");
   $("answer").textContent = data.answer;
 
   if (data.citations.length) {
     $("cites").innerHTML = "<h2>Sources</h2>" + data.citations.map((c) => `
-      <div class="cite">
+      <div class="glass cite">
         <div class="head">
           <span class="sec">${escapeHtml(c.section)}</span>
-          <span class="score">${c.document} · ${c.score}</span>
+          <span class="meta">${c.document} - ${c.score}</span>
         </div>
-        <div class="snip">${escapeHtml(c.snippet)}…</div>
+        <div class="snip">${escapeHtml(c.snippet)}...</div>
       </div>`).join("");
   }
 
   const usage = data.usage;
+  $("meta").style.display = "flex";
   $("meta").innerHTML = [
     `${data.latency_ms} ms`,
     `${usage.input_tokens} in / ${usage.output_tokens} out tokens`,
     `$${usage.estimated_cost_usd.toFixed(6)}`,
     usage.cached ? `<span class="badge">cached</span>` : ""
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean).join(" &middot; ");
 }
 
 function escapeHtml(text) {
