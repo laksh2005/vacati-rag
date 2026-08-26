@@ -11,19 +11,19 @@ python ingest.py              # builds index/
 uvicorn app.main:app --reload
 ```
 
-This starts a server, it does not open a file. Once it's running, open **`http://localhost:8000/`** in a browser for the demo page (do not open `app/static/index.html` directly, it needs the API behind it), or **`http://localhost:8000/docs`** for the interactive API reference.
+This starts a server, it does not open a file. Once it is running, open **`http://localhost:8000/`** in your browser for the demo page (do not open `app/static/index.html` directly, it needs the server running), or **`http://localhost:8000/docs`** for the API reference.
 
 ```bash
 pytest                          # unit tests, no key needed
-python eval.py --retrieval-only # dense vs hybrid recall, free, no model calls
-python eval.py                  # full eval incl. rerank + guardrail, uses chat quota
+python eval.py --retrieval-only # checks search quality, free, no model calls
+python eval.py                  # full check, uses your Gemini quota
 ```
 
-Free-tier Gemini keys are capped per day per model. Every chat call retries on 429, but a full eval run needs ~40 calls, so use `--retrieval-only` if quota is tight.
+Free Gemini keys have a daily limit per model. Every call retries if it hits that limit, but a full `eval.py` run uses around 40 calls, so use `--retrieval-only` if you are low on quota.
 
 ## API
 
-Every `/v1` route needs an `X-API-Key` header.
+Every `/v1` request needs an `X-API-Key` header.
 
 **`POST /v1/query`**
 
@@ -43,11 +43,11 @@ Every `/v1` route needs an `X-API-Key` header.
 }
 ```
 
-`answer_type` is what to branch on, not the status code. `grounded` means at least one real citation backs the answer; `insufficient_context` means retrieval found nothing relevant, or the model couldn't answer from the context, either way returned as HTTP 200 with empty citations.
+Check `answer_type`, not the HTTP status. `grounded` means the answer has at least one real source. `insufficient_context` means the documents did not have a good answer, either because nothing relevant was found or the model could not answer from what it was given. Both cases return a normal 200 response.
 
-`GET /v1/documents` lists indexed docs. `GET /health` needs no auth.
+`GET /v1/documents` lists the indexed documents. `GET /health` does not need a key.
 
-Errors are one shape: `{ "error": { "code": "...", "message": "..." } }`. 401 unauthorized, 422 invalid_request, 429 rate_limited, 502 upstream_error.
+Every error looks the same: `{ "error": { "code": "...", "message": "..." } }`. 401 means a missing or wrong key, 422 means bad input, 429 means too many requests, 502 means the model call failed.
 
 ```bash
 curl -s localhost:8000/v1/query \
@@ -57,34 +57,34 @@ curl -s localhost:8000/v1/query \
 
 ## Design decisions
 
-**Chunking.** Prose splits on markdown headings, a `##` section is one policy or one FAQ answer, splitting mid-section would break the meaning. Long sections split further with overlap; short ones merge into the next. Catalogue records are one chunk each, never split, a tour or menu item is one fact, splitting it separates a price from its name. Every chunk is embedded with a heading breadcrumb prefixed (`Cancellation Policy > Villa Aurora`), which is what keeps two near-identical property policies from getting confused with each other.
+**Chunking.** Plain text documents are split by heading. Each `##` section is one policy or one answer, so splitting there keeps the meaning whole. Long sections get split again with a bit of overlap, and short ones get joined with the next. Catalog items like tours and menu entries are kept as one chunk each, splitting them would separate a price from what it belongs to. Every chunk also gets its heading path added before it is turned into a vector, for example `Cancellation Policy > Villa Aurora`, so two similar-looking policies for different properties don't get mixed up.
 
-**Retrieval.** Query embedded as `RETRIEVAL_QUERY`, docs as `RETRIEVAL_DOCUMENT` (mismatching these costs quality silently). Dense cosine search catches paraphrase, BM25 catches exact strings like prices and property names. Both are fused with Reciprocal Rank Fusion, then reranked in one batched Gemini call, which also produces the relevance score the guardrail thresholds on.
+**Retrieval.** The question is turned into a vector the same way the documents were, then two kinds of search run at once: one that matches meaning (good for different wording of the same question) and one that matches exact words like prices or property names. Their results are combined, then a Gemini call scores how relevant each result actually is, this score is also what decides whether to answer at all.
 
-**Hallucination guardrails**, four layers, none of them sufficient alone:
-1. Below-threshold relevance skips generation entirely.
-2. System prompt only allows the numbered context blocks, no outside knowledge.
-3. Structured output forces `sufficient_context: bool` instead of hedging in prose.
-4. Citations pointing at blocks never sent are dropped; if none remain, the answer downgrades to the fallback.
+**Stopping hallucinations.** Four checks, since no single one is enough on its own:
+1. If nothing scores high enough, the model is never even asked, the answer is skipped straight to "not enough information."
+2. The model is told to only use the given passages, nothing else.
+3. The model has to explicitly say whether it had enough information, instead of just guessing in normal text.
+4. Any source the model claims that wasn't actually given to it gets removed. If none are left, the answer is replaced with "not enough information."
 
-**Cost and latency.** ~$0.0015 and 2.5-4s per grounded query, almost entirely the two chat calls (rerank + answer), retrieval itself is under 5ms. Flash with thinking off, one batched rerank call instead of one per candidate, 768-dim embeddings, and an in-memory response cache that returns repeats at 0ms for $0.
+**Cost and speed.** A normal answer costs about $0.0015 and takes 2.5 to 4 seconds, almost all of that time is the two model calls (scoring results, then writing the answer). Search itself is under 5 milliseconds. To keep costs down: a fast, lighter model, one scoring call instead of one per result, smaller vectors, and repeated questions are cached and cost nothing.
 
-**Retrieval quality.** `python eval.py --retrieval-only` on 21 questions (17 answerable):
+**How well retrieval works.** Run with `python eval.py --retrieval-only` on 21 test questions (17 have real answers):
 
-| Strategy | Recall@1 | Recall@5 |
+| Method | Top answer correct | Correct answer in top 5 |
 |---|---|---|
-| Dense only | 88% | 100% |
-| Hybrid (dense + BM25) | 94% | 100% |
+| Meaning search only | 88% | 100% |
+| Meaning + exact word search | 94% | 100% |
 
-Recall@5 saturates fast on this small a corpus, recall@1 is what separates the strategies. `python eval.py` fills in the rerank and guardrail rows on a chat-capable key.
+With this few documents, almost everything shows up somewhere in the top 5, so that number alone doesn't tell you much. Whether the top answer is right is the more useful number, and combining both search methods does better there. `python eval.py` (the full version) also checks how well the model decides when to answer versus say "I don't know."
 
 ## Tradeoffs
 
-- Vector store is a numpy array on disk. Correct at this scale (brute-force cosine takes microseconds over ~35 chunks); would become HNSW or a real vector DB past ~100k chunks, and the swap is localized since retrieval lives behind one `retrieve()` function.
-- Reranker is an LLM call, not a dedicated cross-encoder, to keep everything on one Gemini key. A dedicated reranker would be faster and cheaper per call.
-- Cache and rate limiter are in-process dicts: correct for one instance, would move to Redis for multiple.
-- Corpus is synthetic, written to include hard cases (near-identical policies, exact prices) on purpose.
+- The document vectors are stored in a plain file on disk. That's fine for this size, searching them takes microseconds. With far more documents, this would need a proper vector database, and that change would only need to happen in one place in the code.
+- The result-scoring step uses a general Gemini call instead of a model built just for that. This keeps everything on one API key, but a dedicated model would likely be faster and cheaper.
+- Caching and rate limits are stored in memory. That works for one server, but would need to move to something shared, like Redis, if there were more than one.
+- The documents are made up for this project, written on purpose to include tricky cases, like two similar policies for different properties.
 
 ## Scaling
 
-What breaks first as the corpus grows, and roughly where: past ~10k chunks, ingest gets slow, that's a queue and parallel embedding, not a rewrite. Past ~100k chunks, brute-force cosine stops being instant, that's HNSW or a managed vector DB (Qdrant, pgvector). Past that, in-memory BM25 stops fitting too, and lexical search moves to something like OpenSearch. Multiple instances means the cache and rate limiter need to move to Redis, they're in-process dicts today. None of this touches chunking, the hybrid+rerank shape, or the guardrails, those are decisions shaped by the content, not by scale.
+Roughly what would need to change as the number of documents grows. At around 10,000 chunks, loading everything in gets slow, so that step would run in parallel instead of one at a time. At around 100,000 chunks, searching the plain file gets slow too, so that would move to a proper search index or vector database. Past that, even keyword search needs a dedicated tool instead of running in memory. If the app runs on more than one server, the cache and rate limits need to move somewhere shared instead of living inside each server. None of this changes how documents are split, how search works, or the safety checks, those depend on the content, not the size.
