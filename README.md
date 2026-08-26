@@ -84,3 +84,7 @@ Recall@5 saturates fast on this small a corpus, recall@1 is what separates the s
 - Reranker is an LLM call, not a dedicated cross-encoder, to keep everything on one Gemini key. A dedicated reranker would be faster and cheaper per call.
 - Cache and rate limiter are in-process dicts: correct for one instance, would move to Redis for multiple.
 - Corpus is synthetic, written to include hard cases (near-identical policies, exact prices) on purpose.
+
+## Scaling
+
+What breaks first as the corpus grows, and roughly where: past ~10k chunks, ingest gets slow, that's a queue and parallel embedding, not a rewrite. Past ~100k chunks, brute-force cosine stops being instant, that's HNSW or a managed vector DB (Qdrant, pgvector). Past that, in-memory BM25 stops fitting too, and lexical search moves to something like OpenSearch. Multiple instances means the cache and rate limiter need to move to Redis, they're in-process dicts today. None of this touches chunking, the hybrid+rerank shape, or the guardrails, those are decisions shaped by the content, not by scale.
