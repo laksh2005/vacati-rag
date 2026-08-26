@@ -10,88 +10,77 @@
 <style>
   :root {
     --font: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    --bg-1: #1a1033; --bg-2: #0e1730; --bg-3: #2a1245;
-    --text: #f4f1fb; --dim: #b3aed1;
-    --glass: rgba(255,255,255,0.07); --glass-strong: rgba(255,255,255,0.12);
-    --border: rgba(255,255,255,0.14); --border-strong: rgba(255,255,255,0.28);
-    --accent: #9a8cff; --accent-2: #6ee7d8; --warn: #ffc98b;
+    --bg: #0b0c0f;
+    --text: #eceef1; --dim: #8a8f98;
+    --glass: rgba(255,255,255,0.04);
+    --border: rgba(255,255,255,0.09); --border-strong: rgba(255,255,255,0.18);
+    --accent: #eceef1; --warn: #d9a86c;
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; min-height: 100vh; padding: 48px 20px;
-    font-family: var(--font); color: var(--text);
-    background:
-      radial-gradient(circle at 15% 10%, rgba(154,140,255,0.35), transparent 45%),
-      radial-gradient(circle at 85% 20%, rgba(110,231,216,0.22), transparent 40%),
-      radial-gradient(circle at 50% 90%, rgba(255,120,180,0.18), transparent 45%),
-      linear-gradient(160deg, var(--bg-1), var(--bg-2) 60%, var(--bg-3));
-    background-attachment: fixed;
+    margin: 0; min-height: 100vh; padding: 64px 20px;
+    font-family: var(--font); color: var(--text); background: var(--bg);
   }
-  main { max-width: 780px; margin: 0 auto; }
-  h1 { font-size: 30px; font-weight: 650; margin: 0 0 6px; letter-spacing: -0.02em; }
-  p.sub { color: var(--dim); margin: 0 0 28px; font-size: 15px; max-width: 55ch; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
+  p.sub { color: var(--dim); margin: 0 0 32px; font-size: 14px; max-width: 52ch; line-height: 1.5; }
 
   .glass {
     background: var(--glass);
     border: 1px solid var(--border);
-    border-radius: 18px;
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    border-radius: 12px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
-  .panel { padding: 20px; margin-bottom: 16px; }
+  .panel { padding: 18px; margin-bottom: 12px; }
 
   input {
-    width: 100%; font-family: var(--font); font-size: 15px;
-    padding: 13px 16px; color: var(--text);
-    background: rgba(0,0,0,0.18); border: 1px solid var(--border);
-    border-radius: 12px; outline: none; transition: border-color .15s, background .15s;
+    width: 100%; font-family: var(--font); font-size: 14px;
+    padding: 11px 14px; color: var(--text);
+    background: rgba(0,0,0,0.25); border: 1px solid var(--border);
+    border-radius: 8px; outline: none; transition: border-color .15s;
   }
   input::placeholder { color: var(--dim); }
-  input:focus { border-color: var(--accent); background: rgba(0,0,0,0.28); }
+  input:focus { border-color: var(--border-strong); }
 
-  .row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .row { display: flex; gap: 8px; margin-bottom: 10px; }
   .row input { flex: 1; }
 
   button {
-    font-family: var(--font); font-weight: 600; font-size: 15px;
-    padding: 13px 22px; border: 1px solid var(--border-strong); border-radius: 12px;
-    color: #150c2b; cursor: pointer;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    box-shadow: 0 4px 16px rgba(154,140,255,0.35);
-    transition: transform .12s, box-shadow .12s;
+    font-family: var(--font); font-weight: 600; font-size: 14px;
+    padding: 11px 20px; border: 1px solid var(--text); border-radius: 8px;
+    color: var(--bg); cursor: pointer; background: var(--text);
+    transition: opacity .12s;
   }
-  button:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(154,140,255,0.5); }
-  button:active { transform: translateY(0); }
-  button:disabled { opacity: .5; cursor: default; transform: none; box-shadow: none; }
+  button:hover { opacity: .85; }
+  button:disabled { opacity: .35; cursor: default; }
 
-  .samples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .samples { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
   .samples button {
-    background: var(--glass); color: var(--dim); font-weight: 400; font-size: 13px;
-    padding: 8px 14px; box-shadow: none; border: 1px solid var(--border);
+    background: transparent; color: var(--dim); font-weight: 400; font-size: 12.5px;
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px;
   }
-  .samples button:hover { color: var(--text); border-color: var(--border-strong); background: var(--glass-strong); box-shadow: none; }
+  .samples button:hover { color: var(--text); border-color: var(--border-strong); opacity: 1; }
 
-  #answer { font-size: 15.5px; line-height: 1.65; white-space: pre-wrap; border-left: 3px solid var(--accent); }
+  #answer { font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; border-left: 2px solid var(--text); }
   #answer.fallback { border-left-color: var(--warn); color: var(--warn); }
   #answer.empty { color: var(--dim); border-left-color: var(--border); }
 
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); font-weight: 600; margin: 0 0 10px; }
-  .cite { padding: 14px 16px; margin-bottom: 10px; }
-  .cite .head { display: flex; justify-content: space-between; gap: 14px; font-size: 13px; margin-bottom: 6px; }
-  .cite .sec { color: var(--accent-2); font-weight: 600; }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 600; margin: 0 0 8px; }
+  .cite { padding: 12px 14px; margin-bottom: 8px; }
+  .cite .head { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; margin-bottom: 5px; }
+  .cite .sec { color: var(--text); font-weight: 600; }
   .cite .meta { color: var(--dim); white-space: nowrap; }
-  .cite .snip { color: var(--dim); font-size: 14px; line-height: 1.5; }
+  .cite .snip { color: var(--dim); font-size: 13px; line-height: 1.5; }
 
   #meta {
-    color: var(--dim); font-size: 13px; padding: 12px 18px;
-    display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
+    color: var(--dim); font-size: 12.5px; padding: 10px 16px;
+    display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
   }
   .badge {
-    background: rgba(110,231,216,0.18); color: var(--accent-2);
-    border: 1px solid rgba(110,231,216,0.35);
-    border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--border-strong); color: var(--text);
+    border-radius: 4px; padding: 1px 8px; font-size: 11px; font-weight: 600;
   }
 </style>
 </head>
