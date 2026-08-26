@@ -4,6 +4,7 @@ The whole HTTP surface is in this file so it can be read top to bottom.
 """
 
 import hashlib
+import logging
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -12,6 +13,8 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
+
+logger = logging.getLogger("vacati_rag")
 
 from app.chunker import est_tokens
 from app.config import settings
@@ -83,12 +86,15 @@ def require_api_key(x_api_key: str = Header(default="", alias="X-API-Key")) -> s
 
 # --------------------------------------------------------------------------
 # Response cache: a repeated question costs nothing and returns instantly.
+# Keyed per API key too, so one caller never gets served another caller's
+# cached answer (and its usage/cost numbers) for the "same" question.
 # --------------------------------------------------------------------------
 _cache: dict[str, tuple[float, QueryResponse]] = {}
+CACHE_MAX_ENTRIES = 1000
 
 
-def cache_key(query: str, top_k: int) -> str:
-    return hashlib.sha256(f"{query.strip().lower()}|{top_k}".encode()).hexdigest()
+def cache_key(api_key: str, query: str, top_k: int) -> str:
+    return hashlib.sha256(f"{api_key}|{query.strip().lower()}|{top_k}".encode()).hexdigest()
 
 
 def cache_get(key: str) -> QueryResponse | None:
@@ -97,6 +103,15 @@ def cache_get(key: str) -> QueryResponse | None:
         return hit[1]
     _cache.pop(key, None)
     return None
+
+
+def cache_set(key: str, response: QueryResponse) -> None:
+    if len(_cache) >= CACHE_MAX_ENTRIES:
+        # Cheap unbounded-growth guard: drop the oldest-expiring entries first.
+        oldest = sorted(_cache, key=lambda k: _cache[k][0])[: len(_cache) - CACHE_MAX_ENTRIES + 1]
+        for stale in oldest:
+            _cache.pop(stale, None)
+    _cache[key] = (time.time() + settings.cache_ttl_seconds, response)
 
 
 def estimate_cost(input_tokens: int, output_tokens: int, embed_tokens: int) -> float:
@@ -121,10 +136,10 @@ def estimate_cost(input_tokens: int, output_tokens: int, embed_tokens: int) -> f
     },
     summary="Ask a question, get a grounded answer with sources",
 )
-def query(body: QueryRequest, _key: str = Depends(require_api_key)) -> QueryResponse:
+def query(body: QueryRequest, api_key: str = Depends(require_api_key)) -> QueryResponse:
     started = time.perf_counter()
 
-    key = cache_key(body.query, body.top_k)
+    key = cache_key(api_key, body.query, body.top_k)
     cached = cache_get(key)
     if cached:
         return cached.model_copy(
@@ -197,7 +212,7 @@ def _respond(
         ),
         latency_ms=int((time.perf_counter() - started) * 1000),
     )
-    _cache[key] = (time.time() + settings.cache_ttl_seconds, response)
+    cache_set(key, response)
     return response
 
 
@@ -253,4 +268,7 @@ def validation_error(request: Request, exc: RequestValidationError) -> JSONRespo
 
 @app.exception_handler(GeminiError)
 def gemini_error(request: Request, exc: GeminiError) -> JSONResponse:
-    return error(502, "upstream_error", f"The language model call failed: {exc}")
+    # Log the raw provider error server-side; never hand it to the caller,
+    # it can carry internal details we don't want to expose over the API.
+    logger.error("Gemini call failed: %s", exc)
+    return error(502, "upstream_error", "The language model call failed. Try again shortly.")
